@@ -7,9 +7,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,10 +15,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Set up JDK 17
+    - name: Set up JDK 11
       uses: actions/setup-java@v5
       with:
-        java-version: '17'
+        java-version: '11'
         distribution: 'temurin'
 
     - name: Setup Android SDK
@@ -30,13 +27,8 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Clean Gradle cache
-      run: |
-        rm -rf ~/.gradle/caches/
-        rm -rf ~/.gradle/wrapper/
-
     - name: Build APK
-      run: ./gradlew assembleDebug --no-build-cache --refresh-dependencies
+      run: ./gradlew assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v6

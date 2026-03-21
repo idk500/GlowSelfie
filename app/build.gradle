@@ -1,7 +1,6 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace 'com.glowselfie.app'
     compileSdk 34
 
     defaultConfig {

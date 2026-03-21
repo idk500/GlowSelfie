@@ -12,11 +12,6 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
     }
-    versionCatalogs {
-        create("libs") {
-            version("kotlin", "1.8.22")
-        }
-    }
 }
 
 rootProject.name = "GlowSelfie"

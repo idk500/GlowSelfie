@@ -31,7 +31,7 @@ jobs:
       run: chmod +x gradlew
 
     - name: Build APK
-      run: ./gradlew assembleDebug --stacktrace
+      run: ./gradlew assembleDebug --refresh-dependencies
 
     - name: Upload APK
       uses: actions/upload-artifact@v6

@@ -15,29 +15,24 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v5
+    - uses: actions/setup-java@v5
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+    - uses: android-actions/setup-android@v3
 
-    - name: Clear all caches
+    - name: Clear all caches and jetified files
       run: |
         rm -rf ~/.gradle/
         rm -rf ~/.android/
-        rm -rf ./gradle/wrapper/*.jar
         rm -rf ./app/build/
         rm -rf ./.gradle/
-
-    - name: Download Gradle Wrapper
-      run: |
-        curl -L -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/master/gradle/wrapper/gradle-wrapper.jar
+        find /home -name "*jetified*" -type f -delete 2>/dev/null || true
+        find /tmp -name "*jetified*" -type f -delete 2>/dev/null || true
 
     - run: chmod +x gradlew
-    - run: ./gradlew assembleDebug --refresh-dependencies --no-build-cache
+    - run: ./gradlew assembleDebug --refresh-dependencies --no-build-cache --no-daemon
 
     - uses: actions/upload-artifact@v6
       with:

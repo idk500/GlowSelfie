@@ -22,8 +22,11 @@ jobs:
 
     - uses: android-actions/setup-android@v3
 
+    - name: Clear Gradle cache
+      run: rm -rf ~/.gradle/caches/
+
     - run: chmod +x gradlew
-    - run: ./gradlew assembleDebug
+    - run: ./gradlew assembleDebug --no-build-cache
 
     - uses: actions/upload-artifact@v6
       with:

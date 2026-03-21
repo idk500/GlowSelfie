@@ -3,11 +3,10 @@ package com.glowselfie.app;
 import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.WindowManager;
@@ -83,18 +82,15 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     }
 
     private boolean checkCameraPermission() {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) 
-            == PackageManager.PERMISSION_GRANTED;
+        return checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestCameraPermission() {
-        ActivityCompat.requestPermissions(this,
-            new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+        requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, 
-                                           int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == CAMERA_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -145,7 +141,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         float normalizedIntensity = intensity / 100f;
         float hueInDegrees = hue * 3.6f;
         float[] hsv = {hueInDegrees, 0.7f * normalizedIntensity, 1.0f};
-        int color = android.graphics.Color.HSVToColor(255, hsv);
+        int color = Color.HSVToColor(255, hsv);
         getWindow().getDecorView().setBackgroundColor(color);
     }
 

@@ -2,39 +2,37 @@ package com.glowselfie.app;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.hardware.Camera;
 import android.os.Bundle;
+import android.os.Environment;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.camera.core.*;
-import androidx.camera.lifecycle.ProcessCameraProvider;
-import androidx.camera.view.PreviewView;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
-    private ExecutorService cameraExecutor;
-    private PreviewView previewView;
-    private ImageCapture imageCapture;
-    private CameraControl cameraControl;
-    private CameraInfo cameraInfo;
-    private ActivityResultLauncher<String[]> activityResultLauncher;
-
-    private final String[] REQUIRED_PERMISSIONS = new String[]{Manifest.permission.CAMERA};
+    private static final int CAMERA_PERMISSION_REQUEST = 100;
     private static final String FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS";
+
+    private Camera camera;
+    private SurfaceView surfaceView;
+    private SurfaceHolder surfaceHolder;
+    private boolean isCameraStarted = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,36 +43,20 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
-        previewView = findViewById(R.id.previewView);
+        surfaceView = findViewById(R.id.previewView);
         Button captureButton = findViewById(R.id.captureButton);
         SeekBar intensitySlider = findViewById(R.id.intensitySlider);
         SeekBar hueSlider = findViewById(R.id.hueSlider);
 
         getWindow().getDecorView().setBackgroundColor(0xFFFF6B9D);
 
-        cameraExecutor = Executors.newSingleThreadExecutor();
+        surfaceHolder = surfaceView.getHolder();
+        surfaceHolder.addCallback(this);
 
-        activityResultLauncher = registerForActivityResult(
-            new ActivityResultContracts.RequestMultiplePermissions(),
-            permissions -> {
-                boolean permissionGranted = true;
-                for (String permission : REQUIRED_PERMISSIONS) {
-                    if (!permissions.getOrDefault(permission, false)) {
-                        permissionGranted = false;
-                    }
-                }
-                if (!permissionGranted) {
-                    Toast.makeText(this, "权限被拒绝", Toast.LENGTH_SHORT).show();
-                } else {
-                    startCamera();
-                }
-            }
-        );
-
-        if (allPermissionsGranted()) {
+        if (checkCameraPermission()) {
             startCamera();
         } else {
-            activityResultLauncher.launch(REQUIRED_PERMISSIONS);
+            requestCameraPermission();
         }
 
         captureButton.setOnClickListener(v -> takePhoto());
@@ -102,86 +84,135 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void startCamera() {
-        ProcessCameraProvider cameraProviderFuture = ProcessCameraProvider.getInstance(this);
+    private boolean checkCameraPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) 
+            == PackageManager.PERMISSION_GRANTED;
+    }
 
-        cameraProviderFuture.addListener(() -> {
-            try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+    private void requestCameraPermission() {
+        ActivityCompat.requestPermissions(this,
+            new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+    }
 
-                Preview preview = new Preview.Builder().build();
-                preview.setSurfaceProvider(previewView.getSurfaceProvider());
-
-                imageCapture = new ImageCapture.Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                    .build();
-
-                CameraSelector cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA;
-
-                cameraProvider.unbindAll();
-
-                Camera camera = cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture
-                );
-
-                cameraControl = camera.getCameraControl();
-                cameraInfo = camera.getCameraInfo();
-
-            } catch (Exception exc) {
-                Toast.makeText(this, "相机启动失败: " + exc.getMessage(), Toast.LENGTH_SHORT).show();
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, 
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startCamera();
+            } else {
+                Toast.makeText(this, "相机权限被拒绝", Toast.LENGTH_SHORT).show();
             }
-        }, ContextCompat.getMainExecutor(this));
+        }
+    }
+
+    private void startCamera() {
+        try {
+            camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
+            Camera.Parameters parameters = camera.getParameters();
+            camera.setParameters(parameters);
+            isCameraStarted = true;
+        } catch (Exception e) {
+            Toast.makeText(this, "无法打开相机: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void takePhoto() {
-        if (imageCapture == null) return;
+        if (camera == null) {
+            Toast.makeText(this, "相机未就绪", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        File photoFile = new File(
-            getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES),
-            new SimpleDateFormat(FILENAME_FORMAT, Locale.US).format(new Date()) + ".jpg"
-        );
+        camera.takePicture(null, null, (data, camera) -> {
+            File photoFile = new File(
+                getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+                new SimpleDateFormat(FILENAME_FORMAT, Locale.US).format(new Date()) + ".jpg"
+            );
 
-        ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(photoFile).build();
-
-        imageCapture.takePicture(
-            outputOptions,
-            ContextCompat.getMainExecutor(this),
-            new ImageCapture.OnImageSavedCallback() {
-                @Override
-                public void onError(@NonNull ImageCaptureException exc) {
-                    Toast.makeText(MainActivity.this, "拍照失败: " + exc.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-
-                @Override
-                public void onImageSaved(@NonNull ImageCapture.OutputFileResults output) {
-                    Toast.makeText(MainActivity.this, "照片已保存: " + photoFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-                }
+            try (FileOutputStream fos = new FileOutputStream(photoFile)) {
+                fos.write(data);
+                Toast.makeText(MainActivity.this, 
+                    "照片已保存: " + photoFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+            } catch (IOException e) {
+                Toast.makeText(MainActivity.this, 
+                    "保存失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
-        );
+
+            camera.startPreview();
+        });
     }
 
     private void updateBackgroundColor(int intensity, int hue) {
         float normalizedIntensity = intensity / 100f;
         float hueInDegrees = hue * 3.6f;
-
         float[] hsv = {hueInDegrees, 0.7f * normalizedIntensity, 1.0f};
         int color = android.graphics.Color.HSVToColor(255, hsv);
-
         getWindow().getDecorView().setBackgroundColor(color);
     }
 
-    private boolean allPermissionsGranted() {
-        for (String permission : REQUIRED_PERMISSIONS) {
-            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                return false;
+    @Override
+    public void surfaceCreated(@NonNull SurfaceHolder holder) {
+        if (camera != null) {
+            try {
+                camera.setPreviewDisplay(holder);
+                camera.setDisplayOrientation(90);
+                camera.startPreview();
+            } catch (IOException e) {
+                Toast.makeText(this, "预览失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
         }
-        return true;
+    }
+
+    @Override
+    public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
+        if (holder.getSurface() == null) return;
+        try {
+            camera.stopPreview();
+            camera.setPreviewDisplay(holder);
+            camera.startPreview();
+        } catch (Exception e) {
+            // Ignore
+        }
+    }
+
+    @Override
+    public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+        if (camera != null) {
+            camera.stopPreview();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isCameraStarted && camera == null) {
+            startCamera();
+        }
+        if (camera != null && surfaceHolder.getSurface() != null) {
+            try {
+                camera.setPreviewDisplay(surfaceHolder);
+                camera.startPreview();
+            } catch (IOException e) {
+                // Ignore
+            }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (camera != null) {
+            camera.stopPreview();
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        cameraExecutor.shutdown();
+        if (camera != null) {
+            camera.release();
+            camera = null;
+        }
     }
 }

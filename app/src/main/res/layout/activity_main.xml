@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <androidx.camera.view.PreviewView
+    <SurfaceView
         android:id="@+id/previewView"
         android:layout_width="300dp"
         android:layout_height="400dp"

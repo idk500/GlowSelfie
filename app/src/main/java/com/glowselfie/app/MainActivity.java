@@ -2,13 +2,16 @@ package com.glowselfie.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.Camera;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.MotionEvent;
@@ -16,16 +19,15 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.core.content.FileProvider;
-
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -49,11 +51,14 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private Button resizePreviewButton;
     private Button toggleSettingsButton;
     private Switch neonModeSwitch;
+    private TextView charmDividerLabel;
+    private SeekBar charmDividerSlider;
     private View charmModeBackground;
     private View charmLeftPanel;
     private View charmRightPanel;
+    private View charmDivider;
     private boolean isCameraStarted = false;
-    private File lastPhotoFile;
+    private Uri lastPhotoUri;
     private boolean isNeonMode = false;
 
     private float currentPreviewAspect = 4f / 3f;
@@ -88,9 +93,12 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         resizePreviewButton = findViewById(R.id.resizePreviewButton);
         toggleSettingsButton = findViewById(R.id.toggleSettingsButton);
         neonModeSwitch = findViewById(R.id.neonModeSwitch);
+        charmDividerLabel = findViewById(R.id.charmDividerLabel);
+        charmDividerSlider = findViewById(R.id.charmDividerSlider);
         charmModeBackground = findViewById(R.id.charmModeBackground);
         charmLeftPanel = findViewById(R.id.charmLeftPanel);
         charmRightPanel = findViewById(R.id.charmRightPanel);
+        charmDivider = findViewById(R.id.charmDivider);
 
         updateBackgroundColor(intensitySlider.getProgress(), hueSlider.getProgress());
         setupPreviewInteractions();
@@ -115,8 +123,25 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         neonModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isNeonMode = isChecked;
             hueSlider.setEnabled(!isChecked);
+            charmDividerSlider.setEnabled(isChecked);
+            charmDividerLabel.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+            charmDividerSlider.setVisibility(isChecked ? View.VISIBLE : View.GONE);
             applyCharmModeLayout(isChecked);
             updateBackgroundColor(intensitySlider.getProgress(), hueSlider.getProgress());
+        });
+        charmDividerSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (isNeonMode) {
+                    updateBackgroundColor(intensitySlider.getProgress(), hueSlider.getProgress());
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
         intensitySlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -142,6 +167,9 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         });
 
         updateSettingsToggleText();
+        charmDividerSlider.setEnabled(false);
+        charmDividerLabel.setVisibility(View.GONE);
+        charmDividerSlider.setVisibility(View.GONE);
     }
 
     private void toggleSettingsPanel() {
@@ -289,37 +317,76 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         }
 
         camera.takePicture(null, null, (data, camera) -> {
-            File photoFile = new File(
-                getExternalFilesDir(Environment.DIRECTORY_PICTURES),
-                new SimpleDateFormat(FILENAME_FORMAT, Locale.US).format(new Date()) + ".jpg"
-            );
-
-            try (FileOutputStream fos = new FileOutputStream(photoFile)) {
-                fos.write(data);
-                lastPhotoFile = photoFile;
-                openGalleryButton.setEnabled(true);
-                Toast.makeText(MainActivity.this, 
-                    "照片已保存: " + photoFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-            } catch (IOException e) {
-                Toast.makeText(MainActivity.this, 
-                    "保存失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            try {
+                Uri savedUri = savePhotoToGallery(data);
+                if (savedUri != null) {
+                    lastPhotoUri = savedUri;
+                    openGalleryButton.setEnabled(true);
+                    Toast.makeText(MainActivity.this,
+                            "照片已保存到系统相册", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(MainActivity.this,
+                            "保存失败：无法写入相册", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(MainActivity.this,
+                        "保存失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
 
             camera.startPreview();
         });
     }
 
+    private Uri savePhotoToGallery(byte[] data) throws IOException {
+        String fileName = new SimpleDateFormat(FILENAME_FORMAT, Locale.US).format(new Date()) + ".jpg";
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Images.Media.DISPLAY_NAME, fileName);
+        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + File.separator + "GlowSelfie");
+            values.put(MediaStore.Images.Media.IS_PENDING, 1);
+        } else {
+            File picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+            File outputDir = new File(picturesDir, "GlowSelfie");
+            if (!outputDir.exists() && !outputDir.mkdirs()) {
+                throw new IOException("无法创建相册目录");
+            }
+            File outputFile = new File(outputDir, fileName);
+            values.put(MediaStore.Images.Media.DATA, outputFile.getAbsolutePath());
+        }
+
+        Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+        if (uri == null) {
+            return null;
+        }
+
+        try (OutputStream os = getContentResolver().openOutputStream(uri)) {
+            if (os == null) {
+                throw new IOException("无法打开输出流");
+            }
+            os.write(data);
+            os.flush();
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentValues publish = new ContentValues();
+            publish.put(MediaStore.Images.Media.IS_PENDING, 0);
+            getContentResolver().update(uri, publish, null, null);
+        }
+
+        return uri;
+    }
+
     private void openLastPhoto() {
-        if (lastPhotoFile == null || !lastPhotoFile.exists()) {
+        if (lastPhotoUri == null) {
             Toast.makeText(this, "还没有可查看的照片", Toast.LENGTH_SHORT).show();
             return;
         }
 
         try {
-            Uri uri = FileProvider.getUriForFile(this,
-                    getPackageName() + ".fileprovider", lastPhotoFile);
             Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(uri, "image/*");
+            intent.setDataAndType(lastPhotoUri, "image/*");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             if (intent.resolveActivity(getPackageManager()) != null) {
                 startActivity(intent);
@@ -377,6 +444,9 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         charmModeBackground.setVisibility(View.VISIBLE);
         charmLeftPanel.setBackgroundColor(leftRed);
         charmRightPanel.setBackgroundColor(rightPurple);
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) charmDivider.getLayoutParams();
+        lp.width = dpToPx(8 + (int) (charmDividerSlider.getProgress() * 0.92f));
+        charmDivider.setLayoutParams(lp);
     }
 
     private int applyIntensityToColor(int baseColor, float normalizedIntensity) {

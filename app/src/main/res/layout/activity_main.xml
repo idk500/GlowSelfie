@@ -20,6 +20,12 @@
             android:background="#FF2F5A" />
 
         <View
+            android:id="@+id/charmDivider"
+            android:layout_width="24dp"
+            android:layout_height="match_parent"
+            android:background="#000000" />
+
+        <View
             android:id="@+id/charmRightPanel"
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -59,7 +65,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:layout_margin="16dp"
-        android:layout_marginBottom="92dp"
+        android:layout_marginBottom="124dp"
         android:background="#66000000"
         android:gravity="center_horizontal"
         android:orientation="vertical"
@@ -95,6 +101,24 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/charmDividerLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/charm_divider_label"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <SeekBar
+            android:id="@+id/charmDividerSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="30"
+            android:visibility="gone" />
 
         <TextView
             android:layout_width="match_parent"

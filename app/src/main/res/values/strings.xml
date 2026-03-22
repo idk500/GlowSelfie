@@ -16,4 +16,5 @@
     <string name="hue_right_label">红润</string>
     <string name="show_settings">设置</string>
     <string name="hide_settings">收起</string>
+    <string name="charm_divider_label">红紫分隔宽度（魅力模式）</string>
 </resources>

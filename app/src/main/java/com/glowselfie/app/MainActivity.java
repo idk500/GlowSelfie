@@ -17,6 +17,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.SeekBar;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -44,8 +45,14 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private TextView hueValueText;
     private TextView helpText;
     private Button openGalleryButton;
+    private Button resizePreviewButton;
+    private Switch neonModeSwitch;
+    private View charmModeBackground;
+    private View charmLeftPanel;
+    private View charmRightPanel;
     private boolean isCameraStarted = false;
     private File lastPhotoFile;
+    private boolean isNeonMode = false;
 
     private float currentPreviewAspect = 4f / 3f;
     private final int[] previewWidthDpSteps = {140, 180, 220};
@@ -75,6 +82,11 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         intensityValueText = findViewById(R.id.intensityValueText);
         hueValueText = findViewById(R.id.hueValueText);
         helpText = findViewById(R.id.helpText);
+        resizePreviewButton = findViewById(R.id.resizePreviewButton);
+        neonModeSwitch = findViewById(R.id.neonModeSwitch);
+        charmModeBackground = findViewById(R.id.charmModeBackground);
+        charmLeftPanel = findViewById(R.id.charmLeftPanel);
+        charmRightPanel = findViewById(R.id.charmRightPanel);
 
         updateBackgroundColor(intensitySlider.getProgress(), hueSlider.getProgress());
         setupPreviewInteractions();
@@ -90,6 +102,17 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
         captureButton.setOnClickListener(v -> takePhoto());
         openGalleryButton.setOnClickListener(v -> openLastPhoto());
+        resizePreviewButton.setOnClickListener(v -> {
+            previewSizeStepIndex = (previewSizeStepIndex + 1) % previewWidthDpSteps.length;
+            applyPreviewContainerSize(currentPreviewAspect);
+            Toast.makeText(this, "预览框大小已切换", Toast.LENGTH_SHORT).show();
+        });
+        neonModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isNeonMode = isChecked;
+            hueSlider.setEnabled(!isChecked);
+            applyCharmModeLayout(isChecked);
+            updateBackgroundColor(intensitySlider.getProgress(), hueSlider.getProgress());
+        });
 
         intensitySlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -121,13 +144,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     }
 
     private void setupPreviewInteractions() {
-        previewContainer.setOnLongClickListener(v -> {
-            previewSizeStepIndex = (previewSizeStepIndex + 1) % previewWidthDpSteps.length;
-            applyPreviewContainerSize(currentPreviewAspect);
-            Toast.makeText(this, "预览框大小已切换", Toast.LENGTH_SHORT).show();
-            return true;
-        });
-
         previewContainer.setOnTouchListener((v, event) -> {
             View parent = (View) v.getParent();
             if (parent == null) return false;
@@ -188,7 +204,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
             Camera.Size previewSize = choosePreviewSize(parameters);
             if (previewSize != null) {
                 parameters.setPreviewSize(previewSize.width, previewSize.height);
-                currentPreviewAspect = previewSize.height / (float) previewSize.width;
+                currentPreviewAspect = previewSize.width / (float) previewSize.height;
             }
             camera.setParameters(parameters);
             applyPreviewContainerSize(currentPreviewAspect);
@@ -229,6 +245,12 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         lp.width = widthPx;
         lp.height = heightPx;
         previewContainer.setLayoutParams(lp);
+
+        if (isNeonMode) {
+            centerPreviewContainer();
+        } else {
+            positionPreviewTopCenter();
+        }
     }
 
     private int dpToPx(int dp) {
@@ -287,23 +309,75 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
     private void updateBackgroundColor(int intensity, int hue) {
         float normalizedIntensity = intensity / 100f;
-        float hueInDegrees = hue * 3.6f;
-        float saturation = 0.35f + 0.55f * normalizedIntensity;
-        float value = 0.45f + 0.55f * normalizedIntensity;
-        float[] hsv = {hueInDegrees, saturation, value};
-        int color = Color.HSVToColor(255, hsv);
-        getWindow().getDecorView().setBackgroundColor(color);
+        float hueInDegrees = mapHueToPinkRange(hue);
+
+        if (isNeonMode) {
+            applyCharmSplitBackground(normalizedIntensity);
+        } else {
+            charmModeBackground.setVisibility(View.GONE);
+            float saturation = 0.35f + 0.55f * normalizedIntensity;
+            float value = 0.45f + 0.55f * normalizedIntensity;
+            float[] hsv = {hueInDegrees, saturation, value};
+            int color = Color.HSVToColor(255, hsv);
+            getWindow().getDecorView().setBackgroundColor(color);
+        }
 
         intensityValueText.setText(getString(R.string.intensity_value, intensity));
         hueValueText.setText(getString(R.string.hue_value, Math.round(hueInDegrees)));
 
-        if (intensity < 35) {
+        if (isNeonMode) {
+            helpText.setText("❤魅力模式已开启：屏幕左红右紫。\n建议横屏使用，预览窗会自动居中。\n点右上角按钮可切换预览窗大小。");
+        } else if (intensity < 35) {
             helpText.setText("当前补光偏弱，建议提升强度到 70% 以上。\n拖动预览框到前摄附近，效果更稳定。");
         } else if (intensity < 70) {
-            helpText.setText("当前补光中等，可继续微调色调让肤色更自然。\n长按预览框可切换大小。");
+            helpText.setText("当前补光中等，可继续微调粉色系色调让肤色更自然。\n点预览框右上角按钮可切换大小。");
         } else {
-            helpText.setText("当前补光较强，适合暗光自拍。\n若过曝可轻微降低强度。\n长按预览框可切换大小，拖动可调整位置。");
+            helpText.setText("当前补光较强，适合暗光自拍。\n若过曝可轻微降低强度。\n点右上角按钮可切换大小，拖动可调整位置。");
         }
+    }
+
+    private float mapHueToPinkRange(int progress) {
+        float mapped = 330f + (progress / 100f) * 50f;
+        if (mapped >= 360f) {
+            mapped -= 360f;
+        }
+        return mapped;
+    }
+
+    private void applyCharmSplitBackground(float normalizedIntensity) {
+        float value = 0.35f + 0.65f * normalizedIntensity;
+        int leftRed = Color.HSVToColor(new float[]{350f, 0.85f, value});
+        int rightPurple = Color.HSVToColor(new float[]{285f, 0.80f, value});
+        charmModeBackground.setVisibility(View.VISIBLE);
+        charmLeftPanel.setBackgroundColor(leftRed);
+        charmRightPanel.setBackgroundColor(rightPurple);
+    }
+
+    private void applyCharmModeLayout(boolean enabled) {
+        if (enabled) {
+            centerPreviewContainer();
+            Toast.makeText(this, "❤魅力模式：建议横屏使用，左右分屏补光更明显", Toast.LENGTH_SHORT).show();
+        } else {
+            positionPreviewTopCenter();
+        }
+    }
+
+    private void centerPreviewContainer() {
+        previewContainer.post(() -> {
+            View parent = (View) previewContainer.getParent();
+            if (parent == null) return;
+            previewContainer.setX((parent.getWidth() - previewContainer.getWidth()) / 2f);
+            previewContainer.setY((parent.getHeight() - previewContainer.getHeight()) / 2f);
+        });
+    }
+
+    private void positionPreviewTopCenter() {
+        previewContainer.post(() -> {
+            View parent = (View) previewContainer.getParent();
+            if (parent == null) return;
+            previewContainer.setX((parent.getWidth() - previewContainer.getWidth()) / 2f);
+            previewContainer.setY(dpToPx(28));
+        });
     }
 
     @Override

@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">光美自拍</string>
+    <string name="capture_button">拍照</string>
+    <string name="open_gallery">查看照片</string>
+    <string name="intensity_label">补光强度（屏幕亮度感受）</string>
+    <string name="hue_label">补光色调（建议偏粉）</string>
+    <string name="help_text_default">提示：拖动预览框到前置摄像头附近；长按预览框可切换大小。</string>
+    <string name="intensity_value">强度：%1$d%%</string>
+    <string name="hue_value">色调：%1$d°</string>
 </resources>

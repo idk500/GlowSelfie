@@ -2,17 +2,25 @@ package com.glowselfie.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.Camera;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.core.content.FileProvider;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -28,8 +36,25 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
     private Camera camera;
     private SurfaceView surfaceView;
+    private FrameLayout previewContainer;
     private SurfaceHolder surfaceHolder;
+    private SeekBar intensitySlider;
+    private SeekBar hueSlider;
+    private TextView intensityValueText;
+    private TextView hueValueText;
+    private TextView helpText;
+    private Button openGalleryButton;
     private boolean isCameraStarted = false;
+    private File lastPhotoFile;
+
+    private float currentPreviewAspect = 4f / 3f;
+    private final int[] previewWidthDpSteps = {140, 180, 220};
+    private int previewSizeStepIndex = 1;
+
+    private float touchDownRawX;
+    private float touchDownRawY;
+    private float viewDownX;
+    private float viewDownY;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,15 +62,22 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        setWindowBrightnessMax();
 
         setContentView(R.layout.activity_main);
 
         surfaceView = findViewById(R.id.previewView);
+        previewContainer = findViewById(R.id.previewContainer);
         Button captureButton = findViewById(R.id.captureButton);
-        SeekBar intensitySlider = findViewById(R.id.intensitySlider);
-        SeekBar hueSlider = findViewById(R.id.hueSlider);
+        openGalleryButton = findViewById(R.id.openGalleryButton);
+        intensitySlider = findViewById(R.id.intensitySlider);
+        hueSlider = findViewById(R.id.hueSlider);
+        intensityValueText = findViewById(R.id.intensityValueText);
+        hueValueText = findViewById(R.id.hueValueText);
+        helpText = findViewById(R.id.helpText);
 
-        getWindow().getDecorView().setBackgroundColor(0xFFFF6B9D);
+        updateBackgroundColor(intensitySlider.getProgress(), hueSlider.getProgress());
+        setupPreviewInteractions();
 
         surfaceHolder = surfaceView.getHolder();
         surfaceHolder.addCallback(this);
@@ -57,6 +89,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         }
 
         captureButton.setOnClickListener(v -> takePhoto());
+        openGalleryButton.setOnClickListener(v -> openLastPhoto());
 
         intensitySlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -79,6 +112,50 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
+    }
+
+    private void setWindowBrightnessMax() {
+        WindowManager.LayoutParams params = getWindow().getAttributes();
+        params.screenBrightness = 1.0f;
+        getWindow().setAttributes(params);
+    }
+
+    private void setupPreviewInteractions() {
+        previewContainer.setOnLongClickListener(v -> {
+            previewSizeStepIndex = (previewSizeStepIndex + 1) % previewWidthDpSteps.length;
+            applyPreviewContainerSize(currentPreviewAspect);
+            Toast.makeText(this, "预览框大小已切换", Toast.LENGTH_SHORT).show();
+            return true;
+        });
+
+        previewContainer.setOnTouchListener((v, event) -> {
+            View parent = (View) v.getParent();
+            if (parent == null) return false;
+
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    touchDownRawX = event.getRawX();
+                    touchDownRawY = event.getRawY();
+                    viewDownX = v.getX();
+                    viewDownY = v.getY();
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    float dx = event.getRawX() - touchDownRawX;
+                    float dy = event.getRawY() - touchDownRawY;
+                    float newX = clamp(viewDownX + dx, 0f, Math.max(0f, parent.getWidth() - v.getWidth()));
+                    float newY = clamp(viewDownY + dy, 0f, Math.max(0f, parent.getHeight() - v.getHeight()));
+                    v.setX(newX);
+                    v.setY(newY);
+                    return true;
+                default:
+                    return false;
+            }
+        });
+    }
+
+    private float clamp(float value, float min, float max) {
+        if (value < min) return min;
+        return Math.min(value, max);
     }
 
     private boolean checkCameraPermission() {
@@ -104,12 +181,59 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private void startCamera() {
         try {
             camera = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
+            if (camera == null) {
+                camera = Camera.open();
+            }
             Camera.Parameters parameters = camera.getParameters();
+            Camera.Size previewSize = choosePreviewSize(parameters);
+            if (previewSize != null) {
+                parameters.setPreviewSize(previewSize.width, previewSize.height);
+                currentPreviewAspect = previewSize.height / (float) previewSize.width;
+            }
             camera.setParameters(parameters);
+            applyPreviewContainerSize(currentPreviewAspect);
             isCameraStarted = true;
+
+            if (surfaceHolder != null && surfaceHolder.getSurface() != null) {
+                startPreviewSafely();
+            }
         } catch (Exception e) {
             Toast.makeText(this, "无法打开相机: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private Camera.Size choosePreviewSize(Camera.Parameters parameters) {
+        Camera.Size best = null;
+        for (Camera.Size size : parameters.getSupportedPreviewSizes()) {
+            if (best == null) {
+                best = size;
+                continue;
+            }
+            if (size.width * size.height > best.width * best.height) {
+                best = size;
+            }
+        }
+        return best;
+    }
+
+    private void applyPreviewContainerSize(float aspectPortrait) {
+        int widthDp = previewWidthDpSteps[previewSizeStepIndex];
+        int widthPx = dpToPx(widthDp);
+        int heightPx = (int) (widthPx * aspectPortrait);
+        int minHeight = dpToPx(140);
+        int maxHeight = dpToPx(300);
+        if (heightPx < minHeight) heightPx = minHeight;
+        if (heightPx > maxHeight) heightPx = maxHeight;
+
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) previewContainer.getLayoutParams();
+        lp.width = widthPx;
+        lp.height = heightPx;
+        previewContainer.setLayoutParams(lp);
+    }
+
+    private int dpToPx(int dp) {
+        float density = getResources().getDisplayMetrics().density;
+        return (int) (dp * density + 0.5f);
     }
 
     private void takePhoto() {
@@ -126,6 +250,8 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
             try (FileOutputStream fos = new FileOutputStream(photoFile)) {
                 fos.write(data);
+                lastPhotoFile = photoFile;
+                openGalleryButton.setEnabled(true);
                 Toast.makeText(MainActivity.this, 
                     "照片已保存: " + photoFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
             } catch (IOException e) {
@@ -137,24 +263,62 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         });
     }
 
+    private void openLastPhoto() {
+        if (lastPhotoFile == null || !lastPhotoFile.exists()) {
+            Toast.makeText(this, "还没有可查看的照片", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            Uri uri = FileProvider.getUriForFile(this,
+                    getPackageName() + ".fileprovider", lastPhotoFile);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, "image/*");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (intent.resolveActivity(getPackageManager()) != null) {
+                startActivity(intent);
+            } else {
+                Toast.makeText(this, "未找到可打开图片的应用", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "打开照片失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void updateBackgroundColor(int intensity, int hue) {
         float normalizedIntensity = intensity / 100f;
         float hueInDegrees = hue * 3.6f;
-        float[] hsv = {hueInDegrees, 0.7f * normalizedIntensity, 1.0f};
+        float saturation = 0.35f + 0.55f * normalizedIntensity;
+        float value = 0.45f + 0.55f * normalizedIntensity;
+        float[] hsv = {hueInDegrees, saturation, value};
         int color = Color.HSVToColor(255, hsv);
         getWindow().getDecorView().setBackgroundColor(color);
+
+        intensityValueText.setText(getString(R.string.intensity_value, intensity));
+        hueValueText.setText(getString(R.string.hue_value, Math.round(hueInDegrees)));
+
+        if (intensity < 35) {
+            helpText.setText("当前补光偏弱，建议提升强度到 70% 以上。\n拖动预览框到前摄附近，效果更稳定。");
+        } else if (intensity < 70) {
+            helpText.setText("当前补光中等，可继续微调色调让肤色更自然。\n长按预览框可切换大小。");
+        } else {
+            helpText.setText("当前补光较强，适合暗光自拍。\n若过曝可轻微降低强度。\n长按预览框可切换大小，拖动可调整位置。");
+        }
     }
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        if (camera != null) {
-            try {
-                camera.setPreviewDisplay(holder);
-                camera.setDisplayOrientation(90);
-                camera.startPreview();
-            } catch (IOException e) {
-                Toast.makeText(this, "预览失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
+        startPreviewSafely();
+    }
+
+    private void startPreviewSafely() {
+        if (camera == null || surfaceHolder == null || surfaceHolder.getSurface() == null) return;
+        try {
+            camera.setPreviewDisplay(surfaceHolder);
+            camera.setDisplayOrientation(90);
+            camera.startPreview();
+        } catch (IOException e) {
+            Toast.makeText(this, "预览失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -162,9 +326,10 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
         if (holder.getSurface() == null) return;
         try {
-            camera.stopPreview();
-            camera.setPreviewDisplay(holder);
-            camera.startPreview();
+            if (camera != null) {
+                camera.stopPreview();
+            }
+            startPreviewSafely();
         } catch (Exception e) {
             // Ignore
         }
@@ -180,17 +345,11 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     @Override
     protected void onResume() {
         super.onResume();
+        setWindowBrightnessMax();
         if (isCameraStarted && camera == null) {
             startCamera();
         }
-        if (camera != null && surfaceHolder.getSurface() != null) {
-            try {
-                camera.setPreviewDisplay(surfaceHolder);
-                camera.startPreview();
-            } catch (IOException e) {
-                // Ignore
-            }
-        }
+        startPreviewSafely();
     }
 
     @Override

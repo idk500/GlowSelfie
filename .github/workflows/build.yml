@@ -19,6 +19,13 @@ jobs:
 
     - uses: android-actions/setup-android@v3
 
+    - name: Clear all Gradle caches
+      run: |
+        rm -rf ~/.gradle/
+        rm -rf ~/.android/
+        rm -rf ./app/build/
+        rm -rf ./.gradle/
+
     - name: Setup Gradle 8.7
       uses: gradle/actions/setup-gradle@v4
       with:
@@ -26,7 +33,7 @@ jobs:
         cache-disabled: true
 
     - name: Build Debug APK
-      run: gradle assembleDebug --no-daemon
+      run: gradle assembleDebug --no-daemon --refresh-dependencies --no-build-cache
 
     - uses: actions/upload-artifact@v4
       with:

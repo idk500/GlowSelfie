@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.Camera;
@@ -26,6 +27,8 @@ import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.core.content.pm.PackageInfoCompat;
 
 import java.io.File;
 import java.io.IOException;
@@ -183,7 +186,15 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private void showInfoDialog() {
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_info, null, false);
         TextView versionText = dialogView.findViewById(R.id.versionText);
-        versionText.setText(getString(R.string.version_label, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
+        String versionName = "unknown";
+        long versionCode = -1;
+        try {
+            PackageInfo packageInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+            versionName = packageInfo.versionName;
+            versionCode = PackageInfoCompat.getLongVersionCode(packageInfo);
+        } catch (Exception ignored) {
+        }
+        versionText.setText(getString(R.string.version_label, versionName, versionCode));
 
         new AlertDialog.Builder(this)
                 .setView(dialogView)

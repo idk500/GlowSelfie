@@ -2,6 +2,7 @@ package com.glowselfie.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -19,6 +20,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Switch;
@@ -95,6 +97,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         resizePreviewButton = findViewById(R.id.resizePreviewButton);
         toggleSettingsButton = findViewById(R.id.toggleSettingsButton);
         neonModeSwitch = findViewById(R.id.neonModeSwitch);
+        ImageButton infoButton = findViewById(R.id.infoButton);
         charmDividerLabel = findViewById(R.id.charmDividerLabel);
         charmDividerSlider = findViewById(R.id.charmDividerSlider);
         charmModeBackground = findViewById(R.id.charmModeBackground);
@@ -117,6 +120,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         captureButton.setOnClickListener(v -> takePhoto());
         openGalleryButton.setOnClickListener(v -> openLastPhoto());
         toggleSettingsButton.setOnClickListener(v -> toggleSettingsPanel());
+        infoButton.setOnClickListener(v -> showInfoDialog());
         resizePreviewButton.setOnClickListener(v -> {
             previewSizeStepIndex = (previewSizeStepIndex + 1) % previewWidthDpSteps.length;
             applyPreviewContainerSize(currentPreviewAspect);
@@ -174,6 +178,17 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         charmDividerSlider.setVisibility(View.GONE);
 
         actionBar.post(this::adjustControlsPanelBottomMargin);
+    }
+
+    private void showInfoDialog() {
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_info, null, false);
+        TextView versionText = dialogView.findViewById(R.id.versionText);
+        versionText.setText(getString(R.string.version_label, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
+
+        new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .setPositiveButton("关闭", null)
+                .show();
     }
 
     private void toggleSettingsPanel() {

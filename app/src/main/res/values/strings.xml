@@ -17,4 +17,11 @@
     <string name="show_settings">设置</string>
     <string name="hide_settings">收起</string>
     <string name="charm_divider_label">红紫分隔宽度（魅力模式）</string>
+    <string name="info_button_desc">关于与赞助</string>
+    <string name="info_title">GlowSelfie 信息</string>
+    <string name="info_desc">暗光自拍补光工具。感谢你的使用与反馈。</string>
+    <string name="reward_qrcode_desc">赞赏码</string>
+    <string name="reward_caption">李嘉图 的赞赏码</string>
+    <string name="reward_notice">赞助完全自愿，主要用于设备测试、功能优化与持续维护。感谢支持！</string>
+    <string name="version_label">版本：%1$s (%2$d)</string>
 </resources>

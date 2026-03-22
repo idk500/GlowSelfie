@@ -1,24 +1,23 @@
 # 快速安装指南
 
-第一步：上传到 GitHub
+## 方式一：从 GitHub Releases 安装（推荐）
 
-1. 访问 https://github.com/new
-2. 创建新仓库 GlowSelfie
-3. 点击 upload files
-4. 把整个 GlowSelfie 文件夹拖进去
-5. 点击 Commit changes
+1. 打开仓库的 Releases 页面
+2. 下载最新版本 APK（文件名示例：`GlowSelfie-v1.1.0-debug.apk`）
+3. 将 APK 传到手机后安装
+4. 首次启动授予相机权限
 
-第二步：自动构建 APK
+## 方式二：从 Actions 构建产物安装
 
-1. 点击仓库的 Actions 标签
-2. 等待构建完成（绿色勾）
-3. 点击 Build APK
-4. 下载 GlowSelfie-APK.zip
+1. 打开仓库 Actions 页面
+2. 进入最新的 Build/Release 工作流
+3. 下载 Artifact 中的 APK
+4. 传到手机安装
 
-第三步：安装到手机
+## 维护者发布流程（版本 + Release）
 
-1. 解压得到 app-debug.apk
-2. 传到 Realme GT NEO5
-3. 点击安装
-4. 允许未知来源
-5. 完成
+1. 修改 [app/build.gradle](app/build.gradle) 中 `versionCode` / `versionName`
+2. 更新 [CHANGELOG.md](CHANGELOG.md)
+3. 提交并推送到 `main`
+4. 打标签并推送：`vX.Y.Z`（例如 `v1.1.0`）
+5. GitHub Actions 自动构建并创建 Release，上传 APK 资产

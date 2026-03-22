@@ -59,6 +59,18 @@
             android:textSize="14sp" />
     </FrameLayout>
 
+    <ImageButton
+        android:id="@+id/infoButton"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="16dp"
+        android:background="#66000000"
+        android:contentDescription="@string/info_button_desc"
+        android:padding="8dp"
+        android:src="@android:drawable/ic_menu_info_details"
+        android:tint="#FFFFFF" />
+
     <LinearLayout
         android:id="@+id/controlsPanel"
         android:layout_width="match_parent"

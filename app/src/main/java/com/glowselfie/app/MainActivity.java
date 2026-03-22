@@ -42,6 +42,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private FrameLayout previewContainer;
     private SurfaceHolder surfaceHolder;
     private View controlsPanel;
+    private View actionBar;
     private SeekBar intensitySlider;
     private SeekBar hueSlider;
     private TextView intensityValueText;
@@ -83,6 +84,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         surfaceView = findViewById(R.id.previewView);
         previewContainer = findViewById(R.id.previewContainer);
         controlsPanel = findViewById(R.id.controlsPanel);
+        actionBar = findViewById(R.id.actionBar);
         Button captureButton = findViewById(R.id.captureButton);
         openGalleryButton = findViewById(R.id.openGalleryButton);
         intensitySlider = findViewById(R.id.intensitySlider);
@@ -170,15 +172,26 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         charmDividerSlider.setEnabled(false);
         charmDividerLabel.setVisibility(View.GONE);
         charmDividerSlider.setVisibility(View.GONE);
+
+        actionBar.post(this::adjustControlsPanelBottomMargin);
     }
 
     private void toggleSettingsPanel() {
         if (controlsPanel.getVisibility() == View.VISIBLE) {
             controlsPanel.setVisibility(View.GONE);
         } else {
+            adjustControlsPanelBottomMargin();
             controlsPanel.setVisibility(View.VISIBLE);
         }
         updateSettingsToggleText();
+    }
+
+    private void adjustControlsPanelBottomMargin() {
+        if (controlsPanel == null || actionBar == null) return;
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) controlsPanel.getLayoutParams();
+        int safeGap = dpToPx(16);
+        lp.bottomMargin = actionBar.getHeight() + safeGap;
+        controlsPanel.setLayoutParams(lp);
     }
 
     private void updateSettingsToggleText() {
@@ -545,6 +558,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     protected void onResume() {
         super.onResume();
         setWindowBrightnessMax();
+        actionBar.post(this::adjustControlsPanelBottomMargin);
         if (isCameraStarted && camera == null) {
             startCamera();
         }

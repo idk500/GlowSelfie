@@ -59,10 +59,12 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:layout_margin="16dp"
+        android:layout_marginBottom="92dp"
         android:background="#66000000"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="14dp">
+        android:padding="14dp"
+        android:visibility="gone">
 
         <TextView
             android:id="@+id/helpText"
@@ -130,7 +132,30 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:max="100"
-            android:progress="0" />
+            android:progress="50" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/hue_left_label"
+                android:textColor="#D6EEFF"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:text="@string/hue_right_label"
+                android:textColor="#FFD6D6"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/hueValueText"
@@ -140,31 +165,44 @@
             android:textColor="#FFFFFF"
             android:textSize="12sp" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="center"
-            android:orientation="horizontal">
+    </LinearLayout>
 
-            <Button
-                android:id="@+id/captureButton"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_weight="1"
-                android:text="@string/capture_button"
-                android:textSize="20sp" />
+    <LinearLayout
+        android:id="@+id/actionBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_margin="16dp"
+        android:background="#66000000"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="10dp">
 
-            <Button
-                android:id="@+id/openGalleryButton"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_marginStart="10dp"
-                android:layout_weight="1"
-                android:enabled="false"
-                android:text="@string/open_gallery"
-                android:textSize="16sp" />
-        </LinearLayout>
+        <Button
+            android:id="@+id/captureButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="@string/capture_button"
+            android:textSize="18sp" />
+
+        <Button
+            android:id="@+id/openGalleryButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:enabled="false"
+            android:text="@string/open_gallery"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/toggleSettingsButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:text="@string/show_settings"
+            android:textSize="14sp" />
     </LinearLayout>
 
 </FrameLayout>

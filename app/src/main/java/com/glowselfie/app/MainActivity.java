@@ -39,6 +39,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private SurfaceView surfaceView;
     private FrameLayout previewContainer;
     private SurfaceHolder surfaceHolder;
+    private View controlsPanel;
     private SeekBar intensitySlider;
     private SeekBar hueSlider;
     private TextView intensityValueText;
@@ -46,6 +47,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private TextView helpText;
     private Button openGalleryButton;
     private Button resizePreviewButton;
+    private Button toggleSettingsButton;
     private Switch neonModeSwitch;
     private View charmModeBackground;
     private View charmLeftPanel;
@@ -75,6 +77,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
         surfaceView = findViewById(R.id.previewView);
         previewContainer = findViewById(R.id.previewContainer);
+        controlsPanel = findViewById(R.id.controlsPanel);
         Button captureButton = findViewById(R.id.captureButton);
         openGalleryButton = findViewById(R.id.openGalleryButton);
         intensitySlider = findViewById(R.id.intensitySlider);
@@ -83,6 +86,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         hueValueText = findViewById(R.id.hueValueText);
         helpText = findViewById(R.id.helpText);
         resizePreviewButton = findViewById(R.id.resizePreviewButton);
+        toggleSettingsButton = findViewById(R.id.toggleSettingsButton);
         neonModeSwitch = findViewById(R.id.neonModeSwitch);
         charmModeBackground = findViewById(R.id.charmModeBackground);
         charmLeftPanel = findViewById(R.id.charmLeftPanel);
@@ -102,6 +106,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
         captureButton.setOnClickListener(v -> takePhoto());
         openGalleryButton.setOnClickListener(v -> openLastPhoto());
+        toggleSettingsButton.setOnClickListener(v -> toggleSettingsPanel());
         resizePreviewButton.setOnClickListener(v -> {
             previewSizeStepIndex = (previewSizeStepIndex + 1) % previewWidthDpSteps.length;
             applyPreviewContainerSize(currentPreviewAspect);
@@ -135,6 +140,25 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
+
+        updateSettingsToggleText();
+    }
+
+    private void toggleSettingsPanel() {
+        if (controlsPanel.getVisibility() == View.VISIBLE) {
+            controlsPanel.setVisibility(View.GONE);
+        } else {
+            controlsPanel.setVisibility(View.VISIBLE);
+        }
+        updateSettingsToggleText();
+    }
+
+    private void updateSettingsToggleText() {
+        if (controlsPanel.getVisibility() == View.VISIBLE) {
+            toggleSettingsButton.setText(R.string.hide_settings);
+        } else {
+            toggleSettingsButton.setText(R.string.show_settings);
+        }
     }
 
     private void setWindowBrightnessMax() {
@@ -309,48 +333,79 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
     private void updateBackgroundColor(int intensity, int hue) {
         float normalizedIntensity = intensity / 100f;
-        float hueInDegrees = mapHueToPinkRange(hue);
+        String toneLabel = getToneLabel(hue);
 
         if (isNeonMode) {
             applyCharmSplitBackground(normalizedIntensity);
         } else {
             charmModeBackground.setVisibility(View.GONE);
-            float saturation = 0.35f + 0.55f * normalizedIntensity;
-            float value = 0.45f + 0.55f * normalizedIntensity;
-            float[] hsv = {hueInDegrees, saturation, value};
-            int color = Color.HSVToColor(255, hsv);
-            getWindow().getDecorView().setBackgroundColor(color);
+            int baseColor = pickFillLightBaseColor(hue);
+            int adjustedColor = applyIntensityToColor(baseColor, normalizedIntensity);
+            getWindow().getDecorView().setBackgroundColor(adjustedColor);
         }
 
         intensityValueText.setText(getString(R.string.intensity_value, intensity));
-        hueValueText.setText(getString(R.string.hue_value, Math.round(hueInDegrees)));
+        hueValueText.setText(getString(R.string.hue_value, toneLabel));
 
         if (isNeonMode) {
             helpText.setText("❤魅力模式已开启：屏幕左红右紫。\n建议横屏使用，预览窗会自动居中。\n点右上角按钮可切换预览窗大小。");
         } else if (intensity < 35) {
-            helpText.setText("当前补光偏弱，建议提升强度到 70% 以上。\n拖动预览框到前摄附近，效果更稳定。");
+            helpText.setText("当前补光偏弱，建议提升强度到 70% 以上。\n色调滑杆：左冷白，中粉润，右红润。");
         } else if (intensity < 70) {
-            helpText.setText("当前补光中等，可继续微调粉色系色调让肤色更自然。\n点预览框右上角按钮可切换大小。");
+            helpText.setText("当前补光中等，可继续微调：左冷白显白，中间粉润，右侧红润。\n点预览框右上角按钮可切换大小。");
         } else {
             helpText.setText("当前补光较强，适合暗光自拍。\n若过曝可轻微降低强度。\n点右上角按钮可切换大小，拖动可调整位置。");
         }
     }
 
-    private float mapHueToPinkRange(int progress) {
-        float mapped = 330f + (progress / 100f) * 50f;
-        if (mapped >= 360f) {
-            mapped -= 360f;
+    private int pickFillLightBaseColor(int progress) {
+        int coolWhiteBlue = Color.rgb(196, 230, 255);
+        int softPink = Color.rgb(255, 179, 214);
+        int warmRedPink = Color.rgb(255, 120, 135);
+
+        if (progress <= 50) {
+            float t = progress / 50f;
+            return blendColor(coolWhiteBlue, softPink, t);
         }
-        return mapped;
+        float t = (progress - 50f) / 50f;
+        return blendColor(softPink, warmRedPink, t);
     }
 
     private void applyCharmSplitBackground(float normalizedIntensity) {
-        float value = 0.35f + 0.65f * normalizedIntensity;
-        int leftRed = Color.HSVToColor(new float[]{350f, 0.85f, value});
-        int rightPurple = Color.HSVToColor(new float[]{285f, 0.80f, value});
+        int leftRed = applyIntensityToColor(Color.rgb(255, 0, 20), normalizedIntensity);
+        int rightPurple = applyIntensityToColor(Color.rgb(140, 0, 255), normalizedIntensity);
         charmModeBackground.setVisibility(View.VISIBLE);
         charmLeftPanel.setBackgroundColor(leftRed);
         charmRightPanel.setBackgroundColor(rightPurple);
+    }
+
+    private int applyIntensityToColor(int baseColor, float normalizedIntensity) {
+        float factor = 0.45f + 0.55f * normalizedIntensity;
+        int r = Math.round(Color.red(baseColor) * factor);
+        int g = Math.round(Color.green(baseColor) * factor);
+        int b = Math.round(Color.blue(baseColor) * factor);
+        return Color.rgb(clampColor(r), clampColor(g), clampColor(b));
+    }
+
+    private int blendColor(int start, int end, float t) {
+        int r = Math.round(Color.red(start) + (Color.red(end) - Color.red(start)) * t);
+        int g = Math.round(Color.green(start) + (Color.green(end) - Color.green(start)) * t);
+        int b = Math.round(Color.blue(start) + (Color.blue(end) - Color.blue(start)) * t);
+        return Color.rgb(clampColor(r), clampColor(g), clampColor(b));
+    }
+
+    private int clampColor(int value) {
+        return Math.max(0, Math.min(255, value));
+    }
+
+    private String getToneLabel(int progress) {
+        if (progress < 33) {
+            return getString(R.string.tone_cool);
+        }
+        if (progress > 66) {
+            return getString(R.string.tone_warm);
+        }
+        return getString(R.string.tone_soft);
     }
 
     private void applyCharmModeLayout(boolean enabled) {

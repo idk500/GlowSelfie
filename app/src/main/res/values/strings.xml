@@ -4,9 +4,16 @@
     <string name="capture_button">拍照</string>
     <string name="open_gallery">查看照片</string>
     <string name="intensity_label">补光强度（屏幕亮度感受）</string>
-    <string name="hue_label">补光色调（建议偏粉）</string>
+    <string name="hue_label">补光色调（中间粉润，左冷白，右红润）</string>
     <string name="help_text_default">提示：拖动预览框到前置摄像头附近；点预览框右上角按钮切换大小。开启❤魅力模式可左右分屏补光。</string>
     <string name="intensity_value">强度：%1$d%%</string>
-    <string name="hue_value">色调：%1$d°</string>
+    <string name="hue_value">色调：%1$s</string>
     <string name="charm_mode_label">❤魅力模式（左红右紫）</string>
+    <string name="tone_cool">冷白</string>
+    <string name="tone_soft">粉润</string>
+    <string name="tone_warm">红润</string>
+    <string name="hue_left_label">冷白</string>
+    <string name="hue_right_label">红润</string>
+    <string name="show_settings">设置</string>
+    <string name="hide_settings">收起</string>
 </resources>
